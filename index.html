@@ -11,13 +11,40 @@
     <meta name="apple-mobile-web-app-title" content="ระบบขอสั่งอะไหล่คลังสินค้านวนคร">
     <link rel="apple-touch-icon" href="/icon-192.png">
 
-    <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://code.jquery.com https://opensheet.elk.sh https://docs.google.com https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob: https://drive.google.com https://lh3.googleusercontent.com; connect-src 'self' https://opensheet.elk.sh https://docs.google.com https://script.google.com https://script.googleusercontent.com; frame-src https://docs.google.com https://drive.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://docs.google.com;">
+    <!-- Security Headers (CSP แก้แล้ว ไม่บล็อก SweetAlert2 อีกต่อไป) -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self' https:;
+      script-src 'self' 'unsafe-inline' 
+                 https://cdn.jsdelivr.net 
+                 https://unpkg.com 
+                 https://code.jquery.com 
+                 https://opensheet.elk.sh 
+                 https://docs.google.com 
+                 https://script.google.com 
+                 https://script.googleusercontent.com;
+      style-src 'self' 'unsafe-inline' 
+                https://fonts.googleapis.com 
+                https://cdnjs.cloudflare.com 
+                https://cdn.jsdelivr.net;
+      font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com;
+      img-src 'self' data: https: blob: 
+              https://drive.google.com 
+              https://lh3.googleusercontent.com;
+      connect-src 'self' 
+                  https://opensheet.elk.sh 
+                  https://docs.google.com 
+                  https://script.google.com 
+                  https://script.googleusercontent.com 
+                  https://cdn.jsdelivr.net;
+      frame-src https://docs.google.com https://drive.google.com;
+      object-src 'none'; 
+      base-uri 'self'; 
+      form-action 'self' https://docs.google.com;
+    ">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta name="referrer" content="strict-origin-when-cross-origin">
-    <meta name="google-site-verification" content="your-verification-token-if-any">
-    <meta name="description" content="ระบบภายในสำหรับขอสั่งอะไหล่คลังสินค้านวนคร - เครื่องมือสำหรับพนักงานเท่านั้น ไม่ใช่เว็บไซต์ภายนอก">
+    <meta name="description" content="ระบบภายในสำหรับขอสั่งอะไหล่คลังสินค้านวนคร - เครื่องมือสำหรับพนักงานเท่านั้น">
 
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Itim&display=swap" rel="stylesheet" />
@@ -25,7 +52,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- CSS -->
+    <!-- Your Custom CSS -->
     <link rel="stylesheet" href="style.css">
   </head>
 
@@ -72,7 +99,7 @@
       </div>
 
       <div class="container">
-        <!-- Tabs (hidden) -->
+        <!-- Tabs (ซ่อนไว้) -->
         <div class="tabs" style="display: none;">
           <button class="tab-button active" id="tab-parts" onclick="showTab('parts')">ค้นหาอะไหล่เพื่อเบิก</button>
           <button class="tab-button" id="tab-images" onclick="showTab('images')">ค้นหารูป</button>
@@ -112,28 +139,6 @@
               <tbody></tbody>
             </table>
           </div>
-          <div id="imageModal" class="image-modal">
-            <div class="image-modal-content">
-              <span class="image-close" id="closeImageModal">×</span>
-              <div id="imageModalContent"></div>
-            </div>
-          </div>
-          <div id="pagination" class="pagination">
-            <button id="firstPage"><i class="fas fa-chevron-left"></i><i class="fas fa-chevron-left"></i></button>
-            <button id="prevPage"><i class="fas fa-chevron-left"></i></button>
-            <div id="pageNumbers"></div>
-            <button id="nextPage"><i class="fas fa-chevron-right"></i></button>
-            <button id="lastPage"><i class="fas fa-chevron-right"></i><i class="fas fa-chevron-right"></i></button>
-            <div class="items-per-page">
-              <label for="itemsPerPage">Show</label>
-              <select id="itemsPerPage">
-                <option value="10">10</option>
-                <option value="20" selected>20</option>
-                <option value="30">30</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
         <!-- Images Tab -->
         <div id="images" class="tab-content">
@@ -360,7 +365,7 @@
     </div>
 
     <!-- External Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script src="script.js" defer></script>
   </body>
 </html>
