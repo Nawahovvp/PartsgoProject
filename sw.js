@@ -8,8 +8,6 @@ const SHELL = [
   '/style.css',
   '/script.js',
   '/manifest.json',
-  '/icon-152.png',
-  '/icon-180.png',
   '/icon-192.png',
   '/icon-512.png',
   '/offline.html'
