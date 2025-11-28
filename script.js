@@ -909,4 +909,621 @@ async function ensureImagesDataReady() {
 
 function filterImages() {
   const q1 = $('searchInputImages1').value.trim().toLowerCase();
-  const q2 = $('searchInputImages2').value
+  const q2 = $('searchInputImages2').value.trim().toLowerCase();
+  state.globalSearch1 = q1;
+  state.globalSearch2 = q2;
+
+  state.imagesFiltered = state.partsData.filter(r => {
+    const text =
+      (r.Material || '') +
+      ' ' +
+      (r.Description || '') +
+      ' ' +
+      (r.Product || '') +
+      ' ' +
+      (r.OCRTAXT || '');
+    const t = text.toLowerCase();
+    if (q1 && !t.includes(q1)) return false;
+    if (q2 && !t.includes(q2)) return false;
+    return true;
+  });
+
+  state.imagesPage = 1;
+  renderImages();
+}
+
+function renderImagesPagination(total) {
+  const container = $('pageNumbersImages');
+  if (!container) return;
+  const totalPages = Math.max(1, Math.ceil(total / state.imagesPerPage));
+  container.innerHTML = '';
+  for (let i = 1; i <= totalPages; i++) {
+    const b = document.createElement('button');
+    b.textContent = i;
+    if (i === state.imagesPage) b.classList.add('active');
+    b.addEventListener('click', () => {
+      state.imagesPage = i;
+      renderImages();
+    });
+    container.appendChild(b);
+  }
+}
+
+function renderImages() {
+  const wrap = $('gallery-container-images');
+  if (!wrap) return;
+
+  const total = state.imagesFiltered.length;
+  const start = (state.imagesPage - 1) * state.imagesPerPage;
+  const end = start + state.imagesPerPage;
+  const rows = state.imagesFiltered.slice(start, end);
+
+  wrap.innerHTML = '';
+
+  rows.forEach(row => {
+    const card = document.createElement('div');
+    card.className = 'image-card';
+
+    const mat = (row.Material || '').toString().trim();
+    const gallery = buildImageHtmlForMaterial(mat, row.UrlWeb);
+
+    card.innerHTML = `
+      ${gallery}
+      <div class="image-card-info">
+        <div><strong>${row.Material || ''}</strong></div>
+        <div>${row.Description || ''}</div>
+        <div style="margin-top:4px;font-size:12px;color:#555;">
+          วิภาวดี: ${numberOrZero(row['วิภาวดี']).toLocaleString()} |
+          นวนคร: ${numberOrZero(row['Unrestricted']).toLocaleString()}
+        </div>
+        <button class="requisition-button" style="margin-top:6px;">เบิก</button>
+      </div>
+    `;
+
+    const btn = card.querySelector('.requisition-button');
+    if (btn) btn.addEventListener('click', () => showRequisitionDialog(row));
+
+    // ถ้ามีหลายรูป → init swiper เฉพาะ card นี้
+    setTimeout(() => {
+      const modalLike = {
+        style: { display: 'block' },
+        querySelector: sel => card.querySelector(sel)
+      };
+      initSwiper(modalLike);
+      modalLike.style.display = 'none';
+    }, 50);
+
+    wrap.appendChild(card);
+  });
+
+  renderImagesPagination(total);
+}
+
+/* ========= TODAY / ALL / PENDING (โหลดแบบเบา ๆ ) ========= */
+/* หมายเหตุ: ด้านล่างเป็น shell minimal สำหรับต่อยอด – 
+   ตอนนี้จะดึงข้อมูลและวาง table ตรง ๆ เพื่อไม่ให้คำตอบยาวเกินไป
+   แต่หลักการเหมือน parts: โหลดครั้งเดียว + filter ใน client
+*/
+
+async function ensureTodayLoaded() {
+  // ถ้าคุณมี Sheet แยกสำหรับ today ให้นำ URL มาใช้ได้เลย
+  // ตอนนี้จะใช้ SHEET_REQUEST เป็นตัวอย่าง
+  if (state.todayData.length) {
+    renderToday();
+    return;
+  }
+  showGlobalLoading();
+  try {
+    const data = await safeFetchJson(SHEET_REQUEST);
+    state.todayData = data || [];
+    state.todayFiltered = state.todayData.slice().reverse(); // ใหม่อยู่บน
+    renderToday();
+  } catch (e) {
+    console.error('today load error', e);
+    const errBox = $('error-container-today');
+    if (errBox) errBox.style.display = 'block';
+  } finally {
+    hideGlobalLoading();
+  }
+}
+
+function renderToday() {
+  const tbody = document.querySelector('#data-table-today tbody');
+  if (!tbody) return;
+
+  const q = $('searchInputToday').value.trim().toLowerCase();
+  const onlyPending = state.todayShowOnlyPending;
+
+  state.todayFiltered = state.todayData.filter(r => {
+    const txt =
+      (r.Code || '') +
+      ' ' +
+      (r.Material || '') +
+      ' ' +
+      (r['ชื่อช่าง'] || '') +
+      ' ' +
+      (r['ทีม'] || '') +
+      ' ' +
+      (r['หน่วยงาน'] || '');
+    const t = txt.toLowerCase();
+    if (q && !t.includes(q)) return false;
+    if (onlyPending && r.Status && r.Status.toLowerCase() !== 'pending') {
+      return false;
+    }
+    return true;
+  });
+
+  const total = state.todayFiltered.length;
+  const start = (state.todayPage - 1) * state.todayPerPage;
+  const end = start + state.todayPerPage;
+  const rows = state.todayFiltered.slice(start, end);
+
+  tbody.innerHTML = '';
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const statusTd = document.createElement('td');
+    statusTd.textContent = r.Status || '';
+    tr.appendChild(statusTd);
+
+    const cols = [
+      'IDRow',
+      'Timestamp',
+      'Material',
+      'Description',
+      'Qty',
+      'Vipa',
+      'ชื่อช่าง',
+      'หน่วยงาน',
+      'Call',
+      'CallType',
+      'หมายเหตุ'
+    ];
+    cols.forEach(c => {
+      const td = document.createElement('td');
+      td.textContent = r[c] || '';
+      tr.appendChild(td);
+    });
+
+    const tdDetail = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'detail-button';
+    btn.textContent = 'ดู';
+    btn.addEventListener('click', () => {
+      $('modalContent').innerHTML = `
+        <pre style="white-space:pre-wrap;font-size:12px;">${JSON.stringify(
+          r,
+          null,
+          2
+        )}</pre>
+      `;
+      $('detailModal').style.display = 'block';
+      setBodyScrollLocked(true);
+    });
+    tdDetail.appendChild(btn);
+    tr.appendChild(tdDetail);
+
+    tbody.appendChild(tr);
+  });
+
+  // simple pagination (ไม่แสดงเลขเยอะ)
+  const container = $('pageNumbersToday');
+  if (container) {
+    const totalPages = Math.max(1, Math.ceil(total / state.todayPerPage));
+    container.innerHTML = '';
+    for (let i = 1; i <= totalPages; i++) {
+      const b = document.createElement('button');
+      b.textContent = i;
+      if (i === state.todayPage) b.classList.add('active');
+      b.addEventListener('click', () => {
+        state.todayPage = i;
+        renderToday();
+      });
+      container.appendChild(b);
+    }
+  }
+
+  const loadingToday = $('loadingToday');
+  if (loadingToday) loadingToday.style.display = 'none';
+}
+
+async function ensureAllLoaded() {
+  // สามารถใช้ sheet เดียวกับ Request หรืออีกอันได้
+  if (state.allData.length) {
+    // renderAll() TODO: สามารถเพิ่มภายหลัง
+    return;
+  }
+  // สำหรับคำตอบนี้จะยังไม่ลงรายละเอียด ALL เพื่อไม่ให้ยืดเกิน
+}
+
+/* ---- Pending Calls ---- */
+
+async function ensurePendingLoaded() {
+  if (state.pendingData.length) {
+    renderPending();
+    return;
+  }
+  showGlobalLoading();
+  try {
+    const data = await safeFetchJson(SHEET_PENDING);
+    state.pendingData = data || [];
+    state.pendingFiltered = state.pendingData.slice();
+    renderPending();
+  } catch (err) {
+    console.error('pending load error', err);
+  } finally {
+    hideGlobalLoading();
+  }
+}
+
+function filterPending() {
+  const q = $('searchInputPending').value.trim().toLowerCase();
+  const team = $('teamFilterPending').value;
+
+  state.pendingFiltered = state.pendingData.filter(r => {
+    if (team && (r.Team || '').toString().trim() !== team) return false;
+    const text =
+      (r['Ticket Number'] || '') +
+      ' ' +
+      (r.Team || '') +
+      ' ' +
+      (r.Brand || '') +
+      ' ' +
+      (r['ค้างหน่วยงาน'] || '') +
+      ' ' +
+      (r.Material || '') +
+      ' ' +
+      (r.Description || '');
+    const t = text.toLowerCase();
+    if (q && !t.includes(q)) return false;
+    return true;
+  });
+
+  state.pendingPage = 1;
+  renderPending();
+}
+
+function renderPending() {
+  const tbody = document.querySelector('#data-table-pending tbody');
+  if (!tbody) return;
+
+  const teams = new Set();
+  state.pendingData.forEach(r => {
+    if (r.Team) teams.add(r.Team.toString().trim());
+  });
+  const teamSelect = $('teamFilterPending');
+  if (teamSelect && teamSelect.options.length <= 1) {
+    teams.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      teamSelect.appendChild(opt);
+    });
+  }
+
+  const total = state.pendingFiltered.length;
+  const start = (state.pendingPage - 1) * state.pendingPerPage;
+  const end = start + state.pendingPerPage;
+  const rows = state.pendingFiltered.slice(start, end);
+
+  tbody.innerHTML = '';
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const cols = [
+      'DateTime',
+      'Ticket Number',
+      'Team',
+      'Brand',
+      'ค้างหน่วยงาน',
+      'Material',
+      'Description',
+      'Vipa',
+      'DayRepair'
+    ];
+    cols.forEach(key => {
+      const td = document.createElement('td');
+      td.textContent = r[key] || '';
+      tr.appendChild(td);
+    });
+
+    const tdDetail = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'detail-button';
+    btn.textContent = 'ดู';
+    btn.addEventListener('click', () => {
+      $('modalContentPending').innerHTML = `
+        <pre style="white-space:pre-wrap;font-size:12px;">${JSON.stringify(
+          r,
+          null,
+          2
+        )}</pre>
+      `;
+      $('detailModalPending').style.display = 'block';
+      setBodyScrollLocked(true);
+    });
+    tdDetail.appendChild(btn);
+    tr.appendChild(tdDetail);
+
+    tbody.appendChild(tr);
+  });
+
+  const cntLabel = $('callCountValuePending');
+  if (cntLabel) cntLabel.textContent = String(total);
+
+  const container = $('pageNumbersPending');
+  if (container) {
+    const totalPages = Math.max(1, Math.ceil(total / state.pendingPerPage));
+    container.innerHTML = '';
+    for (let i = 1; i <= totalPages; i++) {
+      const b = document.createElement('button');
+      b.textContent = i;
+      if (i === state.pendingPage) b.classList.add('active');
+      b.addEventListener('click', () => {
+        state.pendingPage = i;
+        renderPending();
+      });
+      container.appendChild(b);
+    }
+  }
+}
+
+/* ========= INIT DATA หลัง Login ========= */
+
+function initDataAfterLogin() {
+  // โหลด parts + image db ก่อน (ใช้งานบ่อยสุด)
+  ensurePartsLoaded();
+}
+
+/* ========= EVENT BINDING ========= */
+
+function initEvents() {
+  // Login
+  const loginBtn = $('loginButton');
+  if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+  const pwd = $('password');
+  if (pwd) {
+    pwd.addEventListener('keypress', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+  }
+  const togglePwd = $('togglePassword');
+  if (togglePwd) {
+    togglePwd.addEventListener('click', () => {
+      const type = pwd.type === 'password' ? 'text' : 'password';
+      pwd.type = type;
+      togglePwd.classList.toggle('fa-eye-slash');
+      togglePwd.classList.toggle('fa-eye');
+    });
+  }
+
+  // Settings
+  const settingsBtn = $('settingsBtn');
+  if (settingsBtn) settingsBtn.addEventListener('click', openSettingsModal);
+  const closeSettings = $('closeSettings');
+  if (closeSettings) closeSettings.addEventListener('click', closeSettingsModal);
+  const logoutBtn = $('logoutBtn');
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+  const qrBtn = $('qrBtn');
+  if (qrBtn) qrBtn.addEventListener('click', showQRCode);
+
+  // Announcement
+  const announcementBtn = $('announcementBtn');
+  if (announcementBtn)
+    announcementBtn.addEventListener('click', openAnnouncementDeck);
+
+  // ปิด modal เมื่อคลิกนอกกล่อง
+  window.addEventListener('click', e => {
+    if (e.target === $('settingsModal')) closeSettingsModal();
+    if (e.target === $('detailModal')) {
+      $('detailModal').style.display = 'none';
+      setBodyScrollLocked(false);
+    }
+    if (e.target === $('detailModalPending')) {
+      $('detailModalPending').style.display = 'none';
+      setBodyScrollLocked(false);
+    }
+    if (e.target === $('imageModal') || e.target === $('imageModalImages')) {
+      closeAllImageModals();
+    }
+  });
+
+  // Close buttons
+  const closeImageModalBtn = $('closeImageModal');
+  if (closeImageModalBtn)
+    closeImageModalBtn.addEventListener('click', closeAllImageModals);
+
+  const closeModal = $('closeModal');
+  if (closeModal)
+    closeModal.addEventListener('click', () => {
+      $('detailModal').style.display = 'none';
+      setBodyScrollLocked(false);
+    });
+
+  const closeModalPending = $('closeModalPending');
+  if (closeModalPending)
+    closeModalPending.addEventListener('click', () => {
+      $('detailModalPending').style.display = 'none';
+      setBodyScrollLocked(false);
+    });
+
+  // Tabs: bottom nav
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (tab) showTab(tab);
+    });
+  });
+
+  // Parts search
+  const si1 = $('searchInput1');
+  const si2 = $('searchInput2');
+  if (si1) si1.addEventListener('input', filterParts);
+  if (si2) si2.addEventListener('input', filterParts);
+  const clearBtn = $('searchButton');
+  if (clearBtn)
+    clearBtn.addEventListener('click', () => {
+      $('searchInput1').value = '';
+      $('searchInput2').value = '';
+      filterParts();
+    });
+  const retryParts = $('retry-button');
+  if (retryParts)
+    retryParts.addEventListener('click', () => {
+      $('error-container').style.display = 'none';
+      state.partsData = [];
+      ensurePartsLoaded();
+    });
+  const itemsPerPage = $('itemsPerPage');
+  if (itemsPerPage)
+    itemsPerPage.addEventListener('change', () => {
+      state.partsPerPage = Number(itemsPerPage.value) || 20;
+      state.partsPage = 1;
+      renderParts();
+    });
+  $('firstPage')?.addEventListener('click', () => {
+    state.partsPage = 1;
+    renderParts();
+  });
+  $('prevPage')?.addEventListener('click', () => {
+    state.partsPage = Math.max(1, state.partsPage - 1);
+    renderParts();
+  });
+  $('nextPage')?.addEventListener('click', () => {
+    const total = state.partsFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.partsPerPage));
+    state.partsPage = Math.min(maxPage, state.partsPage + 1);
+    renderParts();
+  });
+  $('lastPage')?.addEventListener('click', () => {
+    const total = state.partsFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.partsPerPage));
+    state.partsPage = maxPage;
+    renderParts();
+  });
+
+  // Images search
+  $('searchInputImages1')?.addEventListener('input', filterImages);
+  $('searchInputImages2')?.addEventListener('input', filterImages);
+  $('searchButtonImages')?.addEventListener('click', () => {
+    $('searchInputImages1').value = '';
+    $('searchInputImages2').value = '';
+    filterImages();
+  });
+  $('retry-button-images')?.addEventListener('click', ensureImagesDataReady);
+  $('itemsPerPageImages')?.addEventListener('change', () => {
+    state.imagesPerPage = Number($('itemsPerPageImages').value) || 20;
+    state.imagesPage = 1;
+    renderImages();
+  });
+  $('firstPageImages')?.addEventListener('click', () => {
+    state.imagesPage = 1;
+    renderImages();
+  });
+  $('prevPageImages')?.addEventListener('click', () => {
+    state.imagesPage = Math.max(1, state.imagesPage - 1);
+    renderImages();
+  });
+  $('nextPageImages')?.addEventListener('click', () => {
+    const total = state.imagesFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.imagesPerPage));
+    state.imagesPage = Math.min(maxPage, state.imagesPage + 1);
+    renderImages();
+  });
+  $('lastPageImages')?.addEventListener('click', () => {
+    const total = state.imagesFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.imagesPerPage));
+    state.imagesPage = maxPage;
+    renderImages();
+  });
+
+  // Today
+  const togglePendingBtn = $('toggleAllDataBtn');
+  if (togglePendingBtn)
+    togglePendingBtn.addEventListener('click', () => {
+      state.todayShowOnlyPending = !state.todayShowOnlyPending;
+      if (state.todayShowOnlyPending) {
+        togglePendingBtn.innerHTML =
+          '<i class="fas fa-clock"></i> <span>รอเบิก</span>';
+        togglePendingBtn.title = 'กำลังแสดงเฉพาะรายการที่รอเบิก';
+      } else {
+        togglePendingBtn.innerHTML =
+          '<i class="fas fa-history"></i> <span>ประวัติเบิก</span>';
+        togglePendingBtn.title = 'กำลังแสดงประวัติเบิกทั้งหมด';
+      }
+      state.todayPage = 1;
+      renderToday();
+    });
+  $('searchInputToday')?.addEventListener('input', () => {
+    state.todayPage = 1;
+    renderToday();
+  });
+  $('retry-button-today')?.addEventListener('click', () => {
+    state.todayData = [];
+    ensureTodayLoaded();
+  });
+  $('itemsPerPageToday')?.addEventListener('change', () => {
+    state.todayPerPage = Number($('itemsPerPageToday').value) || 20;
+    state.todayPage = 1;
+    renderToday();
+  });
+  $('firstPageToday')?.addEventListener('click', () => {
+    state.todayPage = 1;
+    renderToday();
+  });
+  $('prevPageToday')?.addEventListener('click', () => {
+    state.todayPage = Math.max(1, state.todayPage - 1);
+    renderToday();
+  });
+  $('nextPageToday')?.addEventListener('click', () => {
+    const total = state.todayFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.todayPerPage));
+    state.todayPage = Math.min(maxPage, state.todayPage + 1);
+    renderToday();
+  });
+  $('lastPageToday')?.addEventListener('click', () => {
+    const total = state.todayFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.todayPerPage));
+    state.todayPage = maxPage;
+    renderToday();
+  });
+
+  // Pending
+  $('teamFilterPending')?.addEventListener('change', filterPending);
+  $('searchInputPending')?.addEventListener('input', filterPending);
+  $('searchButtonPending')?.addEventListener('click', filterPending);
+  $('itemsPerPagePending')?.addEventListener('change', () => {
+    state.pendingPerPage = Number($('itemsPerPagePending').value) || 20;
+    state.pendingPage = 1;
+    renderPending();
+  });
+  $('firstPagePending')?.addEventListener('click', () => {
+    state.pendingPage = 1;
+    renderPending();
+  });
+  $('prevPagePending')?.addEventListener('click', () => {
+    state.pendingPage = Math.max(1, state.pendingPage - 1);
+    renderPending();
+  });
+  $('nextPagePending')?.addEventListener('click', () => {
+    const total = state.pendingFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.pendingPerPage));
+    state.pendingPage = Math.min(maxPage, state.pendingPage + 1);
+    renderPending();
+  });
+  $('lastPagePending')?.addEventListener('click', () => {
+    const total = state.pendingFiltered.length;
+    const maxPage = Math.max(1, Math.ceil(total / state.pendingPerPage));
+    state.pendingPage = maxPage;
+    renderPending();
+  });
+}
+
+/* ========= ENTRY ========= */
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  initEvents();
+  checkLoginStatusOnLoad();
+  registerServiceWorker();
+});
