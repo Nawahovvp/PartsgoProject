@@ -1,5 +1,5 @@
 // sw.js — PartsGo v14.5 (28 พ.ย. 2568) — แก้บั๊ก CSP + SweetAlert2 + PWA ครบ!
-const VERSION = 'v14.5';
+const VERSION = 'v14.6';
 const CACHE = `partgo-${VERSION}`;
 
 const SHELL = [
