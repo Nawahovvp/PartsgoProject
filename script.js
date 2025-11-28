@@ -20,7 +20,7 @@ function showUpdateToast() {
   }).then((result) => {
     if (result.isConfirmed) {
       if (newWorker) {
-        newWorker.postMessage({ type: 'SKIP_WAITING });
+        newWorker.postMessage({ type: 'SKIP_WAITING' });
       }
       window.location.reload();
     }
@@ -156,22 +156,27 @@ const tableBodyToday = document.querySelector("#data-table-today tbody");
 const errorContainerToday = document.getElementById("error-container-today");
 const retryButtonToday = document.getElementById("retry-button-today");
 
-toggleAllDataBtn.addEventListener("click", () => {
-  showOnlyPending = !showOnlyPending;
-  if (showOnlyPending) {
-    toggleAllDataBtn.innerHTML = '<i class="fas fa-clock"></i> <span>รอเบิก</span>';
-    toggleAllDataBtn.title = "กำลังแสดงเฉพาะรายการที่รอเบิก";
-    toggleAllDataBtn.style.background = "linear-gradient(135deg, #ccd3db, #e3e7ed)";
-    toggleAllDataBtn.style.color = "white";
-  } else {
-    toggleAllDataBtn.innerHTML = '<i class="fas fa-history"></i> <span>ประวัติเบิก</span>';
-    toggleAllDataBtn.title = "กำลังแสดงประวัติเบิกทั้งหมด";
-    toggleAllDataBtn.style.background = "linear-gradient(135deg, #ccd3db, #e3e7ed)";
-    toggleAllDataBtn.style.color = "white";
-  }
-  currentPageToday = 1;
-  updateTableToday();
-});
+const toggleAllDataBtn = document.getElementById('toggleAllDataBtn');
+
+if (toggleAllDataBtn) {
+  toggleAllDataBtn.addEventListener('click', () => {
+    showOnlyPending = !showOnlyPending;
+    if (showOnlyPending) {
+      toggleAllDataBtn.innerHTML = '<i class="fas fa-clock"></i> <span>รอเบิก</span>';
+      toggleAllDataBtn.title = 'กำลังแสดงเฉพาะรายการที่รอเบิก';
+      toggleAllDataBtn.style.background = 'linear-gradient(135deg, #ccd3db, #e3e7ed)';
+      toggleAllDataBtn.style.color = 'white';
+    } else {
+      toggleAllDataBtn.innerHTML = '<i class="fas fa-history"></i> <span>ประวัติเบิก</span>';
+      toggleAllDataBtn.title = 'กำลังแสดงประวัติเบิกทั้งหมด';
+      toggleAllDataBtn.style.background = 'linear-gradient(135deg, #ccd3db, #e3e7ed)';
+      toggleAllDataBtn.style.color = 'white';
+    }
+    currentPageToday = 1;
+    updateTableToday();
+  });
+}
+
 
 const paginationToday = document.getElementById("paginationToday");
 const pageNumbersToday = document.getElementById("pageNumbersToday");
